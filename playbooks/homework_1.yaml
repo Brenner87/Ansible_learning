@@ -1,0 +1,62 @@
+--- #homework_1
+- hosts: local
+  remote_user: ansible
+  become: yes
+  become_method: sudo
+  connection: ssh
+  gather_facts: yes
+  vars:
+    users: 
+      value1: testuser1
+      value2: testuser2
+    package: /home/ansible/jdk-8u121-linux-x64.rpm
+  tasks:
+  - name: add users
+    user:
+      name:  "{{ item.value }}"
+      state: present
+    register: newuser 
+    with_dict: '{{ users }}'
+    notify: if added
+
+  - name: Download Java
+    get_url:
+      url: http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.rpm
+#      url: http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.rpm?AuthParam=1489362153_0b7fc751fb97312731c472ee52de37cf
+      headers: 'Cookie:gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie'
+      dest: '{{ package }}'
+    notify:
+    - install if loaded
+
+  - name: download Maven
+    get_url: 
+      url: http://apache.volia.net/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
+      dest: /home/ansible/apache-maven-3.3.9-bin.tar.gz
+    notify: 
+      - maven loaded
+      - maven installed
+
+  handlers:
+  - name: install if loaded
+    yum:
+      name: '{{ package }}'
+      state: present
+
+  - name: if added
+    shell: "echo {{ item.value }}:1 | sudo chpasswd"
+    with_dict: "{{ users }}" 
+    when: newuser.changed
+
+  - name: maven loaded
+    unarchive:
+      src: /home/ansible/apache-maven-3.3.9-bin.tar.gz
+      dest: /opt
+
+  - name: maven installed
+    shell: echo 'export PATH=/opt/apache-maven-3.3.9/bin:$PATH'>/etc/profile.d/maven.sh; export PATH=/opt/apache-maven-3.3.9/bin:$PATH
+    #file:
+    #  path: /etc/profile.d/maven.sh
+    #copy:
+    #  content: 'export PATH=/opt/apache-maven-3.3.9/bin:$PATH'
+    #  dest: /etc/profile.d/maven.sh
+      
